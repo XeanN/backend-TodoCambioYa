@@ -38,11 +38,11 @@ Este repositorio contiene únicamente el **backend** de la plataforma. El fronte
 | Spring Security | (gestionado por Boot) | Autenticación y autorización |
 | Spring Data JPA | (gestionado por Boot) | ORM y acceso a datos |
 | Hibernate | (gestionado por Boot) | Implementación JPA |
-| PostgreSQL | 17 | Base de datos principal |
+| PostgreSQL | 16 | Base de datos distribuida (3 nodos) |
 | Flyway | (gestionado por Boot) | Migraciones de base de datos |
 | jjwt | 0.12.5 | Generación y validación de JWT |
 | Maven | 3.9.15 | Gestión de dependencias y build |
-| Docker | — | Contenedores para BD y servicios |
+| Docker | — | Contenedores para los 3 nodos PostgreSQL |
 
 > **Nota:** El proyecto está desarrollado de forma **nativa**, sin uso de Lombok ni MapStruct. Todas las clases incluyen constructores, getters y setters escritos manualmente.
 
@@ -53,11 +53,11 @@ Este repositorio contiene únicamente el **backend** de la plataforma. El fronte
 El proyecto sigue una arquitectura de base de datos evolutiva definida por etapas:
 
 ```
-Fase 1 (actual) ── PostgreSQL nodo único (Lima)
-Fase 2          ── PostgreSQL distribuido (Lima + Arequipa + Trujillo)
-Fase 3          ── MongoDB para datos no estructurados (chat, notificaciones push)
-Fase 4          ── Cassandra para escrituras de alta velocidad (ticks de tipo de cambio)
-Fase 5          ── Hadoop para analítica batch nocturna y reportes ejecutivos
+Fase 1 (completada) ── PostgreSQL nodo único (Lima)
+Fase 2 (actual)     ── PostgreSQL distribuido (Lima :5442 + Arequipa :5443 + Trujillo :5444)
+Fase 3              ── MongoDB para datos no estructurados (chat, notificaciones push)
+Fase 4              ── Cassandra para escrituras de alta velocidad (ticks de tipo de cambio)
+Fase 5              ── Hadoop para analítica batch nocturna y reportes ejecutivos
 ```
 
 Cada fase es **aditiva** — no reemplaza la anterior, sino que suma una nueva tecnología para un patrón de datos distinto.
@@ -76,14 +76,18 @@ backend-TodoCambioYa/
 │       │   ├── dto/
 │       │   │   ├── request/         # Objetos de entrada desde el frontend
 │       │   │   └── response/        # Objetos de salida hacia el frontend
+│       │   ├── config/              # DataSourceConfig + RegionRoutingDataSource
+│       │   ├── context/             # RegionContextHolder
 │       │   ├── service/             # Lógica de negocio (pendiente)
 │       │   ├── controller/          # Endpoints REST (pendiente)
 │       │   └── security/            # JWT + Spring Security (pendiente)
 │       └── resources/
 │           ├── db/migration/
-│           │   └── V1__create_schema.sql   # Schema inicial (Flyway lo ejecuta solo)
-│           └── application.yml             # Configuración de perfiles dev/prod
-├── docker-compose.yml
+│           │   ├── V2__nodo_lima.sql        # Nodo Lima — ejecutar en todocambioya_lima
+│           │   ├── V2__nodo_arequipa.sql    # Nodo Arequipa — ejecutar en todocambioya_arequipa
+│           │   └── V2__nodo_trujillo.sql    # Nodo Trujillo — ejecutar en todocambioya_trujillo
+│           └── application.yml             # Configuración de perfiles dev/prod + 3 datasources
+├── docker-compose.yml                      # 3 nodos PostgreSQL + pgAdmin
 ├── .env.example
 └── pom.xml
 ```
@@ -92,20 +96,82 @@ backend-TodoCambioYa/
 
 ## Base de datos
 
-### Esquema — 14 tablas
+### Fase 2 — PostgreSQL distribuido (actual)
 
-El schema completo está en `src/main/resources/db/migration/V1__create_schema.sql` y es ejecutado automáticamente por Flyway al arrancar la aplicación.
+La base de datos está distribuida en **3 nodos PostgreSQL independientes**, cada uno representando una región geográfica del Perú. Cada nodo corre en un contenedor Docker separado.
+
+| Nodo | Región cubre | Puerto local | Base de datos |
+|---|---|---|---|
+| Lima | Lima, Ica, Callao | `5442` | `todocambioya_lima` |
+| Arequipa | Arequipa, Cusco, Puno, Moquegua, Tacna | `5443` | `todocambioya_arequipa` |
+| Trujillo | Trujillo, Piura, Chiclayo, Cajamarca | `5444` | `todocambioya_trujillo` |
+
+> **Nota sobre puertos:** Los puertos `5442`, `5443`, `5444` se usan para evitar conflicto con la instalación local de PostgreSQL que ocupa el puerto estándar `5432`.
+
+### Estrategia de distribución
+
+Las 14 tablas del esquema se dividen en dos grupos según su naturaleza:
+
+**Tablas replicadas** — catálogos globales con copia idéntica en los 3 nodos:
+
+| Tabla | Razón |
+|---|---|
+| `regiones` | Catálogo de referencia global |
+| `bancos` | Operan en todo el país |
+| `tipos_cambio` | La tasa es igual para todas las regiones |
+| `cupones` | Un cupón puede usarse desde cualquier región |
+| `empresas` | Una empresa puede tener usuarios en varias regiones |
+| `usuarios_empresa` | Los roles pueden cruzar regiones |
+| `referidos` | El referidor y referido pueden ser de regiones distintas |
+
+**Tablas fragmentadas horizontalmente** — cada nodo almacena solo las filas de su región (`region_id`):
+
+| Tabla | Criterio de fragmentación |
+|---|---|
+| `usuarios` | `region_id` del usuario |
+| `cuentas_bancarias` | Región del usuario dueño |
+| `alertas_tipo_cambio` | Región del usuario |
+| `ordenes` | `region_id` de la orden |
+| `comprobantes` | Región de la orden asociada |
+| `notificaciones` | Región del usuario |
+| `auditoria_sesiones` | `region_id` de la sesión |
+
+### Integridad de fragmentación
+
+Cada nodo tiene un `CHECK CONSTRAINT` a nivel de PostgreSQL que rechaza filas con `region_id` incorrecto:
+
+```sql
+-- En nodo Lima: rechaza cualquier usuario que no sea de Lima
+CONSTRAINT chk_region_lima CHECK (region_id = 1)
+
+-- En nodo Arequipa: rechaza cualquier usuario que no sea de Arequipa
+CONSTRAINT chk_region_arequipa CHECK (region_id = 2)
+
+-- En nodo Trujillo: rechaza cualquier usuario que no sea de Trujillo
+CONSTRAINT chk_region_trujillo CHECK (region_id = 3)
+```
+
+### Scripts de migración
+
+Cada nodo tiene su propio script SQL que incluye: creación de tablas, índices, datos de catálogo (seed) y datos de prueba.
 
 ```
-Grupo GEO          → regiones
-Grupo CORE         → usuarios, empresas
-Grupo ROLES        → usuarios_empresa
-Grupo BANCO        → bancos, cuentas_bancarias
-Grupo FX           → tipos_cambio, alertas_tipo_cambio
-Grupo BENEFICIO    → cupones, referidos
-Grupo TRANSACCIÓN  → ordenes, comprobantes
-Grupo SISTEMA      → notificaciones, auditoria_sesiones
+V2__nodo_lima.sql      → ejecutar en todocambioya_lima     (puerto 5442)
+V2__nodo_arequipa.sql  → ejecutar en todocambioya_arequipa (puerto 5443)
+V2__nodo_trujillo.sql  → ejecutar en todocambioya_trujillo (puerto 5444)
 ```
+
+> **Importante:** Flyway apunta al nodo Lima como datasource principal. Los nodos Arequipa y Trujillo se inicializan manualmente ejecutando sus scripts en pgAdmin.
+
+### Datos de prueba incluidos
+
+Cada script incluye datos de prueba listos para demostrar la fragmentación:
+
+| Nodo | Usuarios | Órdenes | Estado órdenes |
+|---|---|---|---|
+| Lima | Carlos Quispe, Ana Torres, Empresa Lima SAC | ORD-LIM-0001, ORD-LIM-0002 | completado |
+| Arequipa | Maria Flores, Roberto Zuniga | ORD-AQP-0001, ORD-AQP-0002 | completado |
+| Trujillo | Luis Chavez, Carmen Ruiz | ORD-TRU-0001, ORD-TRU-0002 | completado / pendiente |
 
 ### Cadena principal de transacción
 
@@ -115,20 +181,20 @@ regiones → usuarios → cuentas_bancarias + tipos_cambio + cupones → ordenes
 
 ### Convenciones
 
-- Tablas con datos de negocio usan `UUID` como PK generado por PostgreSQL con `gen_random_uuid()`
+- Tablas de negocio usan `UUID` como PK generado por PostgreSQL con `gen_random_uuid()`
 - Tablas de catálogo (`regiones`, `bancos`) usan `SERIAL` (entero autoincremental)
+- Las FK entre tablas fragmentadas y replicadas son **FK lógicas** (no físicas) cuando el dato referenciado puede estar en otro nodo
 - Todas las fechas se almacenan en zona horaria `America/Lima`
-- El campo `ip_address` de `auditoria_sesiones` usa tipo `INET` de PostgreSQL, mapeado como `String` en JPA
+- El campo `ip_address` de `auditoria_sesiones` usa tipo `INET` de PostgreSQL
 
-### Migraciones con Flyway
+### Routing de datasources
 
-Flyway gestiona exclusivamente el esquema. Hibernate está configurado con `ddl-auto: validate` — solo verifica que las entidades coincidan con las tablas, nunca modifica la BD.
-
-Los scripts de migración siguen la convención de nombres:
+El `application.yml` define 3 datasources independientes. La clase `RegionRoutingDataSource` extiende `AbstractRoutingDataSource` de Spring y enruta cada query al nodo correcto según el `region_id` del usuario autenticado:
 
 ```
-V1__create_schema.sql        ← Fase 1: schema inicial
-V2__distribute_regions.sql   ← Fase 2: particionado (pendiente)
+region_id = 1  →  HikariPool-Lima      (localhost:5442)
+region_id = 2  →  HikariPool-Arequipa  (localhost:5443)
+region_id = 3  →  HikariPool-Trujillo  (localhost:5444)
 ```
 
 ---
@@ -139,8 +205,8 @@ V2__distribute_regions.sql   ← Fase 2: particionado (pendiente)
 
 - Java 24 instalado
 - Maven 3.9+ instalado
-- PostgreSQL 17 instalado (local o vía Docker)
-- Docker Desktop (opcional, recomendado)
+- Docker Desktop corriendo
+- pgAdmin 4 instalado (para gestión visual de los 3 nodos)
 
 ### Verificar instalaciones
 
@@ -163,83 +229,60 @@ cd backend-TodoCambioYa
 cp .env.example .env
 ```
 
-Edita el archivo `.env` con tus valores locales. En desarrollo los valores por defecto del `application.yml` son suficientes.
-
-### Crear la base de datos (sin Docker)
-
-Si usas PostgreSQL local (pgAdmin o psql):
-
-```sql
-CREATE DATABASE tecambioya;
-```
-
-Luego ajusta el `application.yml` para apuntar al nombre correcto:
-
-```yaml
-datasource:
-  url: jdbc:postgresql://localhost:5432/tecambioya
-```
-
 ---
 
 ## Ejecución
 
-### Opción A — Sin Docker (PostgreSQL local)
+### Levantar los 3 nodos PostgreSQL
 
 ```bash
-# 1. Asegúrate de que PostgreSQL esté corriendo localmente
-# 2. Compila el proyecto
-mvn compile
+docker compose up db-lima db-arequipa db-trujillo -d
 
-# 3. Arranca Spring Boot (Flyway ejecuta V1__create_schema.sql automáticamente)
-mvn spring-boot:run
-
-# 4. Verifica que está corriendo
-# http://localhost:8080/api/actuator/health
-```
-
-### Opción B — Con Docker Compose
-
-```bash
-# 1. Copia las variables de entorno
-cp .env.example .env
-
-# 2. Levanta PostgreSQL Lima y pgAdmin
-docker compose up db-lima pgadmin -d
-
-# 3. Verifica los contenedores
+# Verificar que los 3 están healthy
 docker compose ps
+```
 
-# 4. Arranca Spring Boot
+### Inicializar las bases de datos en pgAdmin
+
+Conectar los 3 servidores en pgAdmin con estos datos:
+
+| Servidor | Host | Puerto | Base de datos | Usuario | Password |
+|---|---|---|---|---|---|
+| TeCambioYa - Lima | `localhost` | `5442` | `todocambioya_lima` | `tcya_user` | `tcya_pass_local` |
+| TeCambioYa - Arequipa | `localhost` | `5443` | `todocambioya_arequipa` | `tcya_user` | `tcya_pass_local` |
+| TeCambioYa - Trujillo | `localhost` | `5444` | `todocambioya_trujillo` | `tcya_user` | `tcya_pass_local` |
+
+Luego ejecutar en cada base de datos su script correspondiente desde el Query Tool (F5):
+
+```
+todocambioya_lima     ← V2__nodo_lima.sql
+todocambioya_arequipa ← V2__nodo_arequipa.sql
+todocambioya_trujillo ← V2__nodo_trujillo.sql
+```
+
+### Arrancar el backend
+
+```bash
 mvn spring-boot:run
 ```
 
-### Acceso a pgAdmin
-
-```
-URL:      http://localhost:5050
-Email:    admin@tecambioya.com
-Password: definido en .env
-```
+Verificar: `http://localhost:8080/api/actuator/health`
 
 ---
 
 ## Perfiles de entorno
 
-El `application.yml` define dos perfiles separados con `---`:
-
 ### Perfil `dev` (por defecto)
 
-Apunta a PostgreSQL local, muestra SQL en consola, logs detallados.
+Apunta a los 3 nodos PostgreSQL en Docker local, muestra SQL en consola, logs detallados.
 
 ```bash
-# Se activa automáticamente, no se necesita ningún parámetro
 mvn spring-boot:run
 ```
 
 ### Perfil `prod`
 
-Requiere variables de entorno reales. No tiene valores por defecto para credenciales.
+Requiere variables de entorno reales con los hosts de cada nodo.
 
 ```bash
 java -jar target/backend-TodoCambioYa.jar --spring.profiles.active=prod
@@ -253,52 +296,31 @@ java -jar target/backend-TodoCambioYa.jar --spring.profiles.active=prod
 
 14 clases Java que mapean directamente a las tablas PostgreSQL mediante anotaciones JPA estándar. Escritas de forma nativa con constructores, getters y setters manuales.
 
-Anotaciones utilizadas:
-
-```java
-@Entity          // marca la clase como tabla
-@Table           // nombre de la tabla en BD
-@Id              // clave primaria
-@UuidGenerator   // genera UUID automáticamente (Hibernate)
-@Column          // configuración de columna
-@ManyToOne       // relación N:1
-@JoinColumn      // columna de clave foránea
-@PrePersist      // hook que se ejecuta antes de insertar
-```
-
 ### Repository (`com.todocambioya.repository`)
 
-14 interfaces que extienden `JpaRepository`. Spring Data JPA genera automáticamente la implementación SQL a partir del nombre del método:
-
-```java
-// Spring genera: SELECT * FROM usuarios WHERE email = ?
-Optional<Usuario> findByEmail(String email);
-
-// Spring genera: SELECT COUNT(*) FROM usuarios WHERE email = ?
-boolean existsByEmail(String email);
-```
+14 interfaces que extienden `JpaRepository`. Spring Data JPA genera automáticamente la implementación SQL a partir del nombre del método.
 
 ### DTO (`com.todocambioya.dto`)
 
-Objetos de transferencia de datos que definen exactamente qué información entra y sale de la API, evitando exponer las entidades directamente.
+Objetos de transferencia de datos que definen exactamente qué información entra y sale de la API.
 
 ```
 dto/request/
-  ├── LoginRequest.java           # email + password
-  ├── RegisterRequest.java        # datos de registro con validaciones
-  ├── OrdenRequest.java           # crear orden de cambio
-  └── CuentaBancariaRequest.java  # agregar cuenta bancaria
+  ├── LoginRequest.java
+  ├── RegisterRequest.java
+  ├── OrdenRequest.java
+  └── CuentaBancariaRequest.java
 
 dto/response/
-  ├── AuthResponse.java           # token JWT + datos del usuario
-  ├── UsuarioResponse.java        # perfil sin password_hash
-  ├── TipoCambioResponse.java     # tasas vigentes
-  ├── OrdenResponse.java          # detalle de una orden
-  ├── CuentaBancariaResponse.java # cuenta con nombre del banco
-  └── ApiResponse.java            # wrapper genérico para todas las respuestas
+  ├── AuthResponse.java
+  ├── UsuarioResponse.java
+  ├── TipoCambioResponse.java
+  ├── OrdenResponse.java
+  ├── CuentaBancariaResponse.java
+  └── ApiResponse.java
 ```
 
-Todas las respuestas de la API siguen el formato:
+Todas las respuestas siguen el formato:
 
 ```json
 {
@@ -317,13 +339,11 @@ Todas las respuestas de la API siguen el formato:
 |---|---|---|
 | `DB_USER` | Usuario de PostgreSQL | `tcya_user` |
 | `DB_PASSWORD` | Contraseña de PostgreSQL | `tcya_pass_local` |
-| `DB_HOST` | Host de PostgreSQL (solo prod) | — |
-| `DB_PORT` | Puerto de PostgreSQL (solo prod) | `5432` |
-| `DB_NAME` | Nombre de la BD (solo prod) | — |
+| `DB_HOST_LIMA` | Host nodo Lima (solo prod) | — |
+| `DB_HOST_AREQUIPA` | Host nodo Arequipa (solo prod) | — |
+| `DB_HOST_TRUJILLO` | Host nodo Trujillo (solo prod) | — |
 | `JWT_SECRET` | Clave secreta para firmar JWT | `dev_secret_key_...` |
 | `JWT_EXPIRATION_MS` | Duración del token en ms | `86400000` (24h) |
-
-> En producción `JWT_SECRET` y `DB_PASSWORD` son **obligatorios** — la aplicación no arranca sin ellos.
 
 ---
 
@@ -331,15 +351,16 @@ Todas las respuestas de la API siguen el formato:
 
 | Componente | Estado |
 |---|---|
-| Schema PostgreSQL (14 tablas) | ✅ Completado |
+| Schema PostgreSQL — Fase 1 (14 tablas, nodo único) | ✅ Completado |
+| Schema PostgreSQL — Fase 2 (3 nodos distribuidos) | ✅ Completado |
 | Entidades JPA (14 clases) | ✅ Completado |
 | Repositories (14 interfaces) | ✅ Completado |
 | DTOs request/response | ✅ Completado |
+| Docker Compose (3 nodos + pgAdmin) | ✅ Completado |
+| RegionRoutingDataSource (routing entre nodos) | 🔄 En progreso |
 | Security + JWT | 🔄 En progreso |
 | Services | 🔄 En progreso |
 | Controllers REST | 🔄 En progreso |
-| Docker Compose completo | 🔄 En progreso |
-| Fase 2 — PostgreSQL distribuido | ⏳ Pendiente |
 | Fase 3 — MongoDB | ⏳ Pendiente |
 | Fase 4 — Cassandra | ⏳ Pendiente |
 | Fase 5 — Hadoop | ⏳ Pendiente |

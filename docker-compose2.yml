@@ -1,7 +1,8 @@
 services:
 
   # ═══════════════════════════════════════════════════════════════
-  # FASE 2 — PostgreSQL Lima (nodo principal :5432)
+  # FASE 1 — PostgreSQL Lima (nodo principal)
+  # Comando para levantar: docker compose up db-lima -d
   # ═══════════════════════════════════════════════════════════════
   db-lima:
     image: postgres:16-alpine
@@ -12,7 +13,7 @@ services:
       POSTGRES_USER:     ${DB_USER:-tcya_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-tcya_pass_local}
     ports:
-      - "5442:5432"
+      - "5432:5432"
     volumes:
       - db_lima_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,82 +26,61 @@ services:
 
 
   # ═══════════════════════════════════════════════════════════════
-  # FASE 2 — PostgreSQL Arequipa (nodo sur :5433)
+  # FASE 2 — PostgreSQL Arequipa (nodo distribuido)
+  # Descomentar cuando llegues a la fase de distribución regional
+  # Comando: docker compose up db-arequipa -d
   # ═══════════════════════════════════════════════════════════════
-  db-arequipa:
-    image: postgres:16-alpine
-    container_name: todocambioya_db_arequipa
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB:       todocambioya_arequipa
-      POSTGRES_USER:     ${DB_USER:-tcya_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-tcya_pass_local}
-    ports:
-      - "5443:5432"
-    volumes:
-      - db_arequipa_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tcya_user} -d todocambioya_arequipa"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - todocambioya_net
+  # db-arequipa:
+  #   image: postgres:16-alpine
+  #   container_name: todocambioya_db_arequipa
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB:       todocambioya_arequipa
+  #     POSTGRES_USER:     ${DB_USER:-tcya_user}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-tcya_pass_local}
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - db_arequipa_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tcya_user} -d todocambioya_arequipa"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - todocambioya_net
 
 
   # ═══════════════════════════════════════════════════════════════
-  # FASE 2 — PostgreSQL Trujillo (nodo norte :5434)
+  # FASE 2 — PostgreSQL Trujillo (nodo distribuido)
+  # Descomentar junto con db-arequipa
+  # Comando: docker compose up db-trujillo -d
   # ═══════════════════════════════════════════════════════════════
-  db-trujillo:
-    image: postgres:16-alpine
-    container_name: todocambioya_db_trujillo
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB:       todocambioya_trujillo
-      POSTGRES_USER:     ${DB_USER:-tcya_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-tcya_pass_local}
-    ports:
-      - "5444:5432"
-    volumes:
-      - db_trujillo_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tcya_user} -d todocambioya_trujillo"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - todocambioya_net
+  # db-trujillo:
+  #   image: postgres:16-alpine
+  #   container_name: todocambioya_db_trujillo
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB:       todocambioya_trujillo
+  #     POSTGRES_USER:     ${DB_USER:-tcya_user}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-tcya_pass_local}
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - db_trujillo_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tcya_user} -d todocambioya_trujillo"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - todocambioya_net
 
 
   # ═══════════════════════════════════════════════════════════════
-  # HERRAMIENTA — pgAdmin (interfaz visual para los 3 nodos)
-  # Acceso: http://localhost:5050
-  # Login:  admin@todocambioya.com / admin123
-  # Conectar manualmente los 3 servidores desde la UI de pgAdmin
-  # ═══════════════════════════════════════════════════════════════
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: todocambioya_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL:    admin@todocambioya.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "5050:80"
-    depends_on:
-      db-lima:
-        condition: service_healthy
-      db-arequipa:
-        condition: service_healthy
-      db-trujillo:
-        condition: service_healthy
-    networks:
-      - todocambioya_net
-
-
-  # ═══════════════════════════════════════════════════════════════
-  # FASE 3 — MongoDB (datos no estructurados)
+  # FASE 3 — MongoDB (datos no estructurados: docs, logs, configs)
   # Descomentar cuando llegues a la fase MongoDB
+  # Comando: docker compose up mongodb -d
   # ═══════════════════════════════════════════════════════════════
   # mongodb:
   #   image: mongo:7
@@ -119,8 +99,9 @@ services:
 
 
   # ═══════════════════════════════════════════════════════════════
-  # FASE 4 — Cassandra (escrituras masivas)
+  # FASE 4 — Cassandra (escrituras masivas: tipos de cambio, auditoría)
   # Descomentar cuando llegues a la fase Cassandra
+  # Comando: docker compose up cassandra -d
   # ═══════════════════════════════════════════════════════════════
   # cassandra:
   #   image: cassandra:4.1
@@ -144,19 +125,40 @@ services:
   #     - todocambioya_net
 
 
+  # ═══════════════════════════════════════════════════════════════
+  # HERRAMIENTA — pgAdmin (interfaz visual para PostgreSQL)
+  # Acceso: http://localhost:5050
+  # Login:  admin@todocambioya.com / admin123
+  # ═══════════════════════════════════════════════════════════════
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: todocambioya_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@todocambioya.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      db-lima:
+        condition: service_healthy
+    networks:
+      - todocambioya_net
+
+
 # ═══════════════════════════════════════════════════════════════
-# VOLÚMENES
+# VOLÚMENES — persisten los datos aunque el contenedor se detenga
 # ═══════════════════════════════════════════════════════════════
 volumes:
   db_lima_data:
-  db_arequipa_data:
-  db_trujillo_data:
-  # mongodb_data:    # descomentar con Fase 3
-  # cassandra_data:  # descomentar con Fase 4
+  # db_arequipa_data:   # descomentar con Fase 2
+  # db_trujillo_data:   # descomentar con Fase 2
+  # mongodb_data:       # descomentar con Fase 3
+  # cassandra_data:     # descomentar con Fase 4
 
 
 # ═══════════════════════════════════════════════════════════════
-# RED
+# RED — todos los servicios se comunican internamente
 # ═══════════════════════════════════════════════════════════════
 networks:
   todocambioya_net:

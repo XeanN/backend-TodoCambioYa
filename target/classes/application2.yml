@@ -1,6 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
-# TodoCambioYa — application.yml  |  Fase 2: PostgreSQL distribuido
-# 3 nodos: Lima (5432) · Arequipa (5433) · Trujillo (5434)
+# TodoCambioYa — application.yml
+# Perfil activo por defecto: dev
+# Para producción: java -jar app.jar --spring.profiles.active=prod
 # ═══════════════════════════════════════════════════════════════
 
 spring:
@@ -11,19 +12,19 @@ spring:
     name: backend-TodoCambioYa
 
   # ─────────────────────────────────────────────
-  # JACKSON
+  # JACKSON — serialización JSON
   # ─────────────────────────────────────────────
   jackson:
-    default-property-inclusion: non_null
+    default-property-inclusion: non_null       # no incluir campos null en respuestas
     serialization:
-      write-dates-as-timestamps: false
+      write-dates-as-timestamps: false          # fechas como ISO-8601, no como número
     time-zone: America/Lima
 
   # ─────────────────────────────────────────────
   # JPA / HIBERNATE
   # ─────────────────────────────────────────────
   jpa:
-    open-in-view: false
+    open-in-view: false                        # evita antipatrón de sesión abierta
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -32,20 +33,20 @@ spring:
           time_zone: America/Lima
 
   # ─────────────────────────────────────────────
-  # FLYWAY — apunta siempre al nodo Lima (primario)
-  # Los nodos Arequipa y Trujillo se inicializan
-  # manualmente con sus respectivos V2__nodo_*.sql
+  # FLYWAY — migraciones automáticas
+  # Busca scripts en: src/main/resources/db/migration/
   # ─────────────────────────────────────────────
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
-    validate-on-migrate: true
-    out-of-order: false
+    baseline-on-migrate: true                  # útil si la BD ya tiene tablas previas
+    validate-on-migrate: true                  # falla si un script ya aplicado fue modificado
+    out-of-order: false                        # los scripts deben aplicarse en orden estricto
 
 ---
 # ═══════════════════════════════════════════════════════════════
-# PERFIL: dev
+# PERFIL: dev  (local con Docker)
+# Activar: es el perfil por defecto
 # ═══════════════════════════════════════════════════════════════
 spring:
   config:
@@ -53,97 +54,79 @@ spring:
       on-profile: dev
 
   # ─────────────────────────────────────────────
-  # DATASOURCE PRINCIPAL — Lima (nodo primario)
-  # Spring Boot y Flyway usan este por defecto
-  # El routing a Arequipa/Trujillo lo hace
-  # RegionRoutingDataSource en tiempo de ejecución
+  # BASE DE DATOS — PostgreSQL Lima (Docker local)
+  # Debe estar corriendo: docker compose up db-lima -d
   # ─────────────────────────────────────────────
   datasource:
-    url:      jdbc:postgresql://localhost:5432/todocambioya_lima
+    url:      jdbc:postgresql://localhost:5432/todocambioya
     username: ${DB_USER:tcya_user}
     password: ${DB_PASSWORD:tcya_pass_local}
     driver-class-name: org.postgresql.Driver
     hikari:
-      pool-name:          HikariPool-Lima-Dev
-      maximum-pool-size:  5
-      minimum-idle:       2
-      connection-timeout: 20000
-      idle-timeout:       300000
-      max-lifetime:       1200000
+      pool-name:            HikariPool-Lima-Dev
+      maximum-pool-size:    5           # pocos conexiones en dev está bien
+      minimum-idle:         2
+      connection-timeout:   20000       # 20 segundos máximo para obtener conexión
+      idle-timeout:         300000      # 5 minutos antes de cerrar conexión idle
+      max-lifetime:         1200000     # 20 minutos vida máxima de una conexión
 
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: true
+      ddl-auto: validate                # Flyway maneja el esquema, Hibernate solo valida
+    show-sql: true                      # ver queries en consola (solo dev)
 
   flyway:
-    url:      jdbc:postgresql://localhost:5432/todocambioya_lima
+    url:      jdbc:postgresql://localhost:5432/todocambioya
     user:     ${DB_USER:tcya_user}
     password: ${DB_PASSWORD:tcya_pass_local}
 
 # ─────────────────────────────────────────────
-# DATASOURCES ADICIONALES — nodos regionales
-# Usados por RegionRoutingDataSource para
-# redirigir queries según region_id del usuario
+# SERVIDOR — dev corre en 8080
 # ─────────────────────────────────────────────
-datasource-arequipa:
-  url:      jdbc:postgresql://localhost:5433/todocambioya_arequipa
-  username: ${DB_USER:tcya_user}
-  password: ${DB_PASSWORD:tcya_pass_local}
-  driver-class-name: org.postgresql.Driver
-  hikari:
-    pool-name:          HikariPool-Arequipa-Dev
-    maximum-pool-size:  5
-    minimum-idle:       1
-    connection-timeout: 20000
-    idle-timeout:       300000
-    max-lifetime:       1200000
-
-datasource-trujillo:
-  url:      jdbc:postgresql://localhost:5434/todocambioya_trujillo
-  username: ${DB_USER:tcya_user}
-  password: ${DB_PASSWORD:tcya_pass_local}
-  driver-class-name: org.postgresql.Driver
-  hikari:
-    pool-name:          HikariPool-Trujillo-Dev
-    maximum-pool-size:  5
-    minimum-idle:       1
-    connection-timeout: 20000
-    idle-timeout:       300000
-    max-lifetime:       1200000
-
 server:
   port: 8080
   servlet:
     context-path: /api
 
+# ─────────────────────────────────────────────
+# JWT — configuración de tokens
+# ─────────────────────────────────────────────
 jwt:
-  secret:        ${JWT_SECRET:dev_secret_key_cambiar_en_produccion_minimo_256_bits}
-  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  secret:         ${JWT_SECRET:dev_secret_key_cambiar_en_produccion_minimo_256_bits}
+  expiration-ms:  ${JWT_EXPIRATION_MS:86400000}    # 24 horas en milisegundos
 
+# ─────────────────────────────────────────────
+# LOGS — dev muestra más detalle
+# ─────────────────────────────────────────────
 logging:
   level:
-    root:                              INFO
-    com.todocambioya:                  DEBUG
-    org.springframework.security:      DEBUG
-    org.flywaydb:                      INFO
-    org.hibernate.SQL:                 DEBUG
-    org.hibernate.type.descriptor.sql: TRACE
+    root:                               INFO
+    com.todocambioya:                   DEBUG   # tu código en detalle
+    org.springframework.security:       DEBUG   # ver qué rechaza Spring Security
+    org.flywaydb:                       INFO    # ver migraciones aplicadas
+    org.hibernate.SQL:                  DEBUG   # ver queries SQL
+    org.hibernate.type.descriptor.sql:  TRACE   # ver parámetros de queries
   pattern:
     console: "%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
+# ─────────────────────────────────────────────
+# ACTUATOR — endpoints de salud
+# ─────────────────────────────────────────────
 management:
   endpoints:
     web:
       exposure:
-        include: health, info, flyway
+        include: health, info, flyway   # flyway muestra las migraciones aplicadas
   endpoint:
     health:
       show-details: always
 
 ---
 # ═══════════════════════════════════════════════════════════════
-# PERFIL: prod
+# PERFIL: prod  (servidor de producción)
+# Activar: --spring.profiles.active=prod
+# Las variables DB_USER, DB_PASSWORD, JWT_SECRET deben estar
+# definidas como variables de entorno en el servidor
 # ═══════════════════════════════════════════════════════════════
 spring:
   config:
@@ -151,53 +134,27 @@ spring:
       on-profile: prod
 
   datasource:
-    url:      jdbc:postgresql://${DB_HOST_LIMA}:5432/todocambioya_lima
+    url:      jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      pool-name:          HikariPool-Lima-Prod
-      maximum-pool-size:  20
-      minimum-idle:       5
-      connection-timeout: 30000
-      idle-timeout:       600000
-      max-lifetime:       1800000
+      pool-name:            HikariPool-Lima-Prod
+      maximum-pool-size:    20
+      minimum-idle:         5
+      connection-timeout:   30000
+      idle-timeout:         600000
+      max-lifetime:         1800000
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
+    show-sql: false                     # nunca mostrar SQL en producción
 
   flyway:
-    url:      jdbc:postgresql://${DB_HOST_LIMA}:5432/todocambioya_lima
+    url:      jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
     user:     ${DB_USER}
     password: ${DB_PASSWORD}
-
-datasource-arequipa:
-  url:      jdbc:postgresql://${DB_HOST_AREQUIPA}:5433/todocambioya_arequipa
-  username: ${DB_USER}
-  password: ${DB_PASSWORD}
-  driver-class-name: org.postgresql.Driver
-  hikari:
-    pool-name:          HikariPool-Arequipa-Prod
-    maximum-pool-size:  15
-    minimum-idle:       3
-    connection-timeout: 30000
-    idle-timeout:       600000
-    max-lifetime:       1800000
-
-datasource-trujillo:
-  url:      jdbc:postgresql://${DB_HOST_TRUJILLO}:5434/todocambioya_trujillo
-  username: ${DB_USER}
-  password: ${DB_PASSWORD}
-  driver-class-name: org.postgresql.Driver
-  hikari:
-    pool-name:          HikariPool-Trujillo-Prod
-    maximum-pool-size:  15
-    minimum-idle:       3
-    connection-timeout: 30000
-    idle-timeout:       600000
-    max-lifetime:       1800000
 
 server:
   port: ${PORT:8080}
@@ -205,7 +162,7 @@ server:
     context-path: /api
 
 jwt:
-  secret:        ${JWT_SECRET}
+  secret:        ${JWT_SECRET}          # obligatorio en prod, sin valor por defecto
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 logging:
@@ -215,7 +172,22 @@ logging:
     org.flywaydb:     INFO
 
   # ─────────────────────────────────────────────
+  # FASE 2 — datasources adicionales por región
+  # Descomentar cuando implementes el routing distribuido
+  # ─────────────────────────────────────────────
+  # datasource-arequipa:
+  #   url:      jdbc:postgresql://localhost:5433/todocambioya_arequipa
+  #   username: ${DB_USER:tcya_user}
+  #   password: ${DB_PASSWORD:tcya_pass_local}
+  #
+  # datasource-trujillo:
+  #   url:      jdbc:postgresql://localhost:5434/todocambioya_trujillo
+  #   username: ${DB_USER:tcya_user}
+  #   password: ${DB_PASSWORD:tcya_pass_local}
+
+  # ─────────────────────────────────────────────
   # FASE 3 — MongoDB
+  # Descomentar cuando llegues a la fase MongoDB
   # ─────────────────────────────────────────────
   # data:
   #   mongodb:
@@ -224,6 +196,7 @@ logging:
 
   # ─────────────────────────────────────────────
   # FASE 4 — Cassandra
+  # Descomentar cuando llegues a la fase Cassandra
   # ─────────────────────────────────────────────
   # cassandra:
   #   contact-points: localhost
