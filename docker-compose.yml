@@ -102,20 +102,21 @@ services:
   # FASE 3 — MongoDB (datos no estructurados)
   # Descomentar cuando llegues a la fase MongoDB
   # ═══════════════════════════════════════════════════════════════
-  # mongodb:
-  #   image: mongo:7
-  #   container_name: todocambioya_mongodb
-  #   restart: unless-stopped
-  #   environment:
-  #     MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-tcya_mongo}
-  #     MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-tcya_mongo_local}
-  #     MONGO_INITDB_DATABASE:      todocambioya_docs
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - mongodb_data:/data/db
-  #   networks:
-  #     - todocambioya_net
+  mongodb:
+    image: mongo:7
+    container_name: todocambioya_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-tcya_mongo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-tcya_mongo_local}
+      MONGO_INITDB_DATABASE:      todocambioya_docs
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./src/main/resources/mongodb/init-collections.js:/docker-entrypoint-initdb.d/init-collections.js:ro
+    networks:
+      - todocambioya_net
 
 
   # ═══════════════════════════════════════════════════════════════
@@ -151,7 +152,7 @@ volumes:
   db_lima_data:
   db_arequipa_data:
   db_trujillo_data:
-  # mongodb_data:    # descomentar con Fase 3
+  mongodb_data:
   # cassandra_data:  # descomentar con Fase 4
 
 

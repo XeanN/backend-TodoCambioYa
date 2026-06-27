@@ -1,11 +1,11 @@
--- ============================================================
--- TECAMBIOYA — Fase 2: Nodo TRUJILLO (puerto 5444)
--- Base de datos: todocambioya_trujillo
+﻿-- ============================================================
+-- TECAMBIOYA ÔÇö Fase 2: Nodo AREQUIPA (puerto 5443)
+-- Base de datos: todocambioya_arequipa
 --
 -- CONTIENE:
---   [REPLICADAS]   Catálogos globales — copia idéntica en los 3 nodos
---   [FRAGMENTADAS] Solo filas donde region_id = 3 (Trujillo)
---                  Cubre: Trujillo, Piura, Chiclayo, Cajamarca
+--   [REPLICADAS]   Cat├ílogos globales ÔÇö copia id├®ntica en los 3 nodos
+--   [FRAGMENTADAS] Solo filas donde region_id = 2 (Arequipa)
+--                  Cubre: Arequipa, Cusco, Puno, Moquegua, Tacna
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -85,7 +85,7 @@ CREATE TABLE referidos (
 );
 
 -- ============================================================
--- TABLAS FRAGMENTADAS — solo filas con region_id = 3 (Trujillo)
+-- TABLAS FRAGMENTADAS ÔÇö solo filas con region_id = 2 (Arequipa)
 -- ============================================================
 
 CREATE TABLE usuarios (
@@ -100,7 +100,7 @@ CREATE TABLE usuarios (
     activo           BOOLEAN DEFAULT TRUE,
     creado_en        TIMESTAMP DEFAULT NOW(),
     actualizado_en   TIMESTAMP DEFAULT NOW(),
-    CONSTRAINT chk_region_trujillo CHECK (region_id = 3)
+    CONSTRAINT chk_region_arequipa CHECK (region_id = 2)
 );
 
 CREATE TABLE cuentas_bancarias (
@@ -141,7 +141,7 @@ CREATE TABLE ordenes (
     region_id          INTEGER REFERENCES regiones(id),
     creado_en          TIMESTAMP DEFAULT NOW(),
     completado_en      TIMESTAMP,
-    CONSTRAINT chk_orden_region_trujillo CHECK (region_id = 3)
+    CONSTRAINT chk_orden_region_arequipa CHECK (region_id = 2)
 );
 
 CREATE TABLE comprobantes (
@@ -171,11 +171,11 @@ CREATE TABLE auditoria_sesiones (
     accion      VARCHAR(15) CHECK (accion IN ('login', 'logout', 'operacion')),
     region_id   INTEGER REFERENCES regiones(id),
     creado_en   TIMESTAMP DEFAULT NOW(),
-    CONSTRAINT chk_auditoria_region_trujillo CHECK (region_id = 3)
+    CONSTRAINT chk_auditoria_region_arequipa CHECK (region_id = 2)
 );
 
 -- ============================================================
--- ÍNDICES
+-- ├ìNDICES
 -- ============================================================
 CREATE INDEX idx_usuarios_email       ON usuarios(email);
 CREATE INDEX idx_ordenes_usuario      ON ordenes(usuario_id);
@@ -186,7 +186,7 @@ CREATE INDEX idx_cuentas_usuario      ON cuentas_bancarias(usuario_id);
 CREATE INDEX idx_notif_usuario_leida  ON notificaciones(usuario_id, leida);
 
 -- ============================================================
--- SEED — catálogos globales (igual en los 3 nodos)
+-- SEED ÔÇö cat├ílogos globales (igual en los 3 nodos)
 -- ============================================================
 INSERT INTO regiones (id, nombre, codigo, nodo_db, activo) VALUES
     (1, 'Lima',     'LIM', 'db-lima:5442',     TRUE),
@@ -207,55 +207,54 @@ INSERT INTO tipos_cambio (moneda_origen, moneda_destino, tasa_compra, tasa_venta
 VALUES ('USD', 'PEN', 3.7100, 3.7500, 3.7300);
 
 -- ============================================================
--- DATOS DE PRUEBA — usuarios y operaciones de Trujillo
+-- DATOS DE PRUEBA ÔÇö usuarios y operaciones de Arequipa
 -- ============================================================
 INSERT INTO usuarios (nombre_completo, email, password_hash, tipo_cuenta, dni_ruc, telefono, region_id) VALUES
-    ('Luis Chavez Vega',     'luis.chavez@gmail.com',   'hash_luis',   'personal', '48123456', '944321098', 3),
-    ('Carmen Ruiz Castillo', 'carmen.ruiz@gmail.com',   'hash_carmen', 'personal', '48123457', '944321099', 3);
+    ('Maria Flores Ccopa',   'maria.flores@gmail.com',   'hash_maria',   'personal', '45123456', '954321098', 2),
+    ('Roberto Zuniga Rios',  'roberto.zuniga@gmail.com', 'hash_roberto', 'personal', '45123457', '954321099', 2);
 
 INSERT INTO cuentas_bancarias (usuario_id, banco_id, numero_cuenta, cci, moneda, alias, verificada)
-SELECT u.id, 3, '01112345678901', '00301112345678901234', 'USD', 'BBVA Dolares', TRUE
-FROM usuarios u WHERE u.email = 'luis.chavez@gmail.com';
+SELECT u.id, 2, '89012345678901', '00289012345678901234', 'USD', 'Interbank Dolares', TRUE
+FROM usuarios u WHERE u.email = 'maria.flores@gmail.com';
 
 INSERT INTO cuentas_bancarias (usuario_id, banco_id, numero_cuenta, cci, moneda, alias, verificada)
-SELECT u.id, 3, '01198765432101', '00301198765432101234', 'PEN', 'BBVA Soles', TRUE
-FROM usuarios u WHERE u.email = 'luis.chavez@gmail.com';
+SELECT u.id, 2, '89098765432101', '00289098765432101234', 'PEN', 'Interbank Soles', TRUE
+FROM usuarios u WHERE u.email = 'maria.flores@gmail.com';
 
 INSERT INTO cuentas_bancarias (usuario_id, banco_id, numero_cuenta, cci, moneda, alias, verificada)
-SELECT u.id, 4, '40011111111101', '00440011111111101234', 'USD', 'Scotiabank Dolares', TRUE
-FROM usuarios u WHERE u.email = 'carmen.ruiz@gmail.com';
+SELECT u.id, 5, '50011111111101', '00550011111111101234', 'USD', 'Caja Arequipa Dolares', TRUE
+FROM usuarios u WHERE u.email = 'roberto.zuniga@gmail.com';
 
 INSERT INTO cuentas_bancarias (usuario_id, banco_id, numero_cuenta, cci, moneda, alias, verificada)
-SELECT u.id, 4, '40022222222201', '00440022222222201234', 'PEN', 'Scotiabank Soles', TRUE
-FROM usuarios u WHERE u.email = 'carmen.ruiz@gmail.com';
+SELECT u.id, 5, '50022222222201', '00550022222222201234', 'PEN', 'Caja Arequipa Soles', TRUE
+FROM usuarios u WHERE u.email = 'roberto.zuniga@gmail.com';
 
 INSERT INTO ordenes (numero_orden, usuario_id, tipo_cambio_id, cuenta_origen_id, cuenta_destino_id, monto_enviado, monto_recibido, tasa_aplicada, estado, region_id)
-SELECT 'ORD-TRU-0001', u.id, t.id, co.id, cd.id, 750.00, 2797.50, 3.7300, 'completado', 3
+SELECT 'ORD-AQP-0001', u.id, t.id, co.id, cd.id, 500.00, 1865.00, 3.7300, 'completado', 2
 FROM usuarios u
 JOIN tipos_cambio t ON t.moneda_origen = 'USD'
 JOIN cuentas_bancarias co ON co.usuario_id = u.id AND co.moneda = 'USD'
 JOIN cuentas_bancarias cd ON cd.usuario_id = u.id AND cd.moneda = 'PEN'
-WHERE u.email = 'luis.chavez@gmail.com';
+WHERE u.email = 'maria.flores@gmail.com';
 
 INSERT INTO ordenes (numero_orden, usuario_id, tipo_cambio_id, cuenta_origen_id, cuenta_destino_id, monto_enviado, monto_recibido, tasa_aplicada, estado, region_id)
-SELECT 'ORD-TRU-0002', u.id, t.id, co.id, cd.id, 200.00, 746.00, 3.7300, 'pendiente', 3
+SELECT 'ORD-AQP-0002', u.id, t.id, co.id, cd.id, 300.00, 1119.00, 3.7300, 'completado', 2
 FROM usuarios u
 JOIN tipos_cambio t ON t.moneda_origen = 'USD'
 JOIN cuentas_bancarias co ON co.usuario_id = u.id AND co.moneda = 'USD'
 JOIN cuentas_bancarias cd ON cd.usuario_id = u.id AND cd.moneda = 'PEN'
-WHERE u.email = 'carmen.ruiz@gmail.com';
+WHERE u.email = 'roberto.zuniga@gmail.com';
 
 INSERT INTO comprobantes (orden_id, numero_comprobante, tipo)
-SELECT id, 'COMP-TRU-0001', 'recibo' FROM ordenes WHERE numero_orden = 'ORD-TRU-0001';
+SELECT id, 'COMP-AQP-0001', 'recibo' FROM ordenes WHERE numero_orden = 'ORD-AQP-0001';
+
+INSERT INTO comprobantes (orden_id, numero_comprobante, tipo)
+SELECT id, 'COMP-AQP-0002', 'recibo' FROM ordenes WHERE numero_orden = 'ORD-AQP-0002';
 
 INSERT INTO notificaciones (usuario_id, tipo, titulo, contenido, leida)
-SELECT u.id, 'orden', 'Orden completada', 'Tu cambio de USD 750.00 fue procesado exitosamente.', FALSE
-FROM usuarios u WHERE u.email = 'luis.chavez@gmail.com';
-
-INSERT INTO notificaciones (usuario_id, tipo, titulo, contenido, leida)
-SELECT u.id, 'orden', 'Orden en proceso', 'Tu cambio de USD 200.00 está siendo procesado.', FALSE
-FROM usuarios u WHERE u.email = 'carmen.ruiz@gmail.com';
+SELECT u.id, 'orden', 'Orden completada', 'Tu cambio de USD 500.00 fue procesado exitosamente.', FALSE
+FROM usuarios u WHERE u.email = 'maria.flores@gmail.com';
 
 INSERT INTO auditoria_sesiones (usuario_id, ip_address, user_agent, accion, region_id)
-SELECT u.id, '190.235.30.1', 'Mozilla/5.0 Chrome/120', 'login', 3
-FROM usuarios u WHERE u.email = 'luis.chavez@gmail.com';
+SELECT u.id, '190.235.20.1', 'Mozilla/5.0 Chrome/120', 'login', 2
+FROM usuarios u WHERE u.email = 'maria.flores@gmail.com';

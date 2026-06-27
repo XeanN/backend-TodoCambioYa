@@ -59,7 +59,7 @@ spring:
   # RegionRoutingDataSource en tiempo de ejecución
   # ─────────────────────────────────────────────
   datasource:
-    url:      jdbc:postgresql://localhost:5432/todocambioya_lima
+    url:      jdbc:postgresql://localhost:5442/todocambioya_lima
     username: ${DB_USER:tcya_user}
     password: ${DB_PASSWORD:tcya_pass_local}
     driver-class-name: org.postgresql.Driver
@@ -76,8 +76,13 @@ spring:
       ddl-auto: validate
     show-sql: true
 
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:tcya_mongo}:${MONGO_PASSWORD:tcya_mongo_local}@localhost:27017/todocambioya_docs?authSource=admin
+      auto-index-creation: true
+
   flyway:
-    url:      jdbc:postgresql://localhost:5432/todocambioya_lima
+    url:      jdbc:postgresql://localhost:5442/todocambioya_lima
     user:     ${DB_USER:tcya_user}
     password: ${DB_PASSWORD:tcya_pass_local}
 
@@ -87,7 +92,7 @@ spring:
 # redirigir queries según region_id del usuario
 # ─────────────────────────────────────────────
 datasource-arequipa:
-  url:      jdbc:postgresql://localhost:5433/todocambioya_arequipa
+  url:      jdbc:postgresql://localhost:5443/todocambioya_arequipa
   username: ${DB_USER:tcya_user}
   password: ${DB_PASSWORD:tcya_pass_local}
   driver-class-name: org.postgresql.Driver
@@ -100,7 +105,7 @@ datasource-arequipa:
     max-lifetime:       1200000
 
 datasource-trujillo:
-  url:      jdbc:postgresql://localhost:5434/todocambioya_trujillo
+  url:      jdbc:postgresql://localhost:5444/todocambioya_trujillo
   username: ${DB_USER:tcya_user}
   password: ${DB_PASSWORD:tcya_pass_local}
   driver-class-name: org.postgresql.Driver

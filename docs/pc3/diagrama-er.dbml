@@ -1,0 +1,119 @@
+// TeCambioYa — Diagrama ER para dbdiagram.io
+// Pegar en https://dbdiagram.io
+
+Table regiones {
+  id int [pk, increment]
+  nombre varchar
+  codigo varchar [unique]
+  nodo_db varchar
+  activo boolean
+}
+
+Table usuarios {
+  id uuid [pk]
+  nombre_completo varchar
+  email varchar [unique]
+  password_hash varchar
+  tipo_cuenta varchar
+  region_id int [ref: > regiones.id]
+}
+
+Table bancos {
+  id int [pk, increment]
+  nombre varchar
+  codigo_bcp varchar
+  tipo varchar
+}
+
+Table cuentas_bancarias {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id]
+  banco_id int [ref: > bancos.id]
+  numero_cuenta varchar
+  moneda varchar
+}
+
+Table tipos_cambio {
+  id uuid [pk]
+  moneda_origen varchar
+  moneda_destino varchar
+  tasa_compra decimal
+  tasa_venta decimal
+  tasa_preferencial decimal
+}
+
+Table cupones {
+  id uuid [pk]
+  codigo varchar [unique]
+  tipo varchar
+  valor decimal
+  usos_maximos int
+  usos_actuales int
+}
+
+Table ordenes {
+  id uuid [pk]
+  numero_orden varchar [unique]
+  usuario_id uuid [ref: > usuarios.id]
+  tipo_cambio_id uuid [ref: > tipos_cambio.id]
+  cuenta_origen_id uuid [ref: > cuentas_bancarias.id]
+  cuenta_destino_id uuid [ref: > cuentas_bancarias.id]
+  monto_enviado decimal
+  monto_recibido decimal
+  tasa_aplicada decimal
+  estado varchar
+  cupon_id uuid [ref: > cupones.id]
+  region_id int [ref: > regiones.id]
+  creado_en timestamp
+  completado_en timestamp
+}
+
+Table comprobantes {
+  id uuid [pk]
+  orden_id uuid [ref: > ordenes.id]
+  numero_comprobante varchar [unique]
+  tipo varchar
+}
+
+Table notificaciones {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id]
+  tipo varchar
+  titulo varchar
+  leida boolean
+}
+
+Table empresas {
+  id uuid [pk]
+  ruc varchar [unique]
+  razon_social varchar
+  region_id int [ref: > regiones.id]
+}
+
+Table usuarios_empresa {
+  id uuid [pk]
+  empresa_id uuid [ref: > empresas.id]
+  usuario_id uuid [ref: > usuarios.id]
+  rol varchar
+}
+
+Table referidos {
+  id uuid [pk]
+  referidor_id uuid [ref: > usuarios.id]
+  referido_id uuid [ref: > usuarios.id]
+  cupon_generado_id uuid [ref: > cupones.id]
+}
+
+Table alertas_tipo_cambio {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id]
+  moneda varchar
+  tasa_objetivo decimal
+}
+
+Table auditoria_sesiones {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id]
+  accion varchar
+  region_id int [ref: > regiones.id]
+}
