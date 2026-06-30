@@ -150,12 +150,10 @@
              FASE 2 — MongoDB (descomentar cuando
              llegues a la fase de base de datos multi-modelo)
         ═══════════════════════════════════════ -->
-        <!--
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
-        -->
 
         <!-- ═══════════════════════════════════════
              FASE 3 — Cassandra (descomentar para

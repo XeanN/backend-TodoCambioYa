@@ -1,9 +1,9 @@
--- ============================================================
--- TECAMBIOYA — Fase 2: Nodo LIMA (puerto 5442)
+﻿-- ============================================================
+-- TECAMBIOYA ÔÇö Fase 2: Nodo LIMA (puerto 5442)
 -- Base de datos: todocambioya_lima
 --
 -- CONTIENE:
---   [REPLICADAS]   Catálogos globales — copia idéntica en los 3 nodos
+--   [REPLICADAS]   Cat├ílogos globales ÔÇö copia id├®ntica en los 3 nodos
 --   [FRAGMENTADAS] Solo filas donde region_id = 1 (Lima)
 -- ============================================================
 
@@ -84,7 +84,7 @@ CREATE TABLE referidos (
 );
 
 -- ============================================================
--- TABLAS FRAGMENTADAS — solo filas con region_id = 1 (Lima)
+-- TABLAS FRAGMENTADAS ÔÇö solo filas con region_id = 1 (Lima)
 -- ============================================================
 
 CREATE TABLE usuarios (
@@ -174,7 +174,7 @@ CREATE TABLE auditoria_sesiones (
 );
 
 -- ============================================================
--- ÍNDICES
+-- ├ìNDICES
 -- ============================================================
 CREATE INDEX idx_usuarios_email       ON usuarios(email);
 CREATE INDEX idx_ordenes_usuario      ON ordenes(usuario_id);
@@ -185,7 +185,7 @@ CREATE INDEX idx_cuentas_usuario      ON cuentas_bancarias(usuario_id);
 CREATE INDEX idx_notif_usuario_leida  ON notificaciones(usuario_id, leida);
 
 -- ============================================================
--- SEED — catálogos globales (igual en los 3 nodos)
+-- SEED ÔÇö cat├ílogos globales (igual en los 3 nodos)
 -- ============================================================
 INSERT INTO regiones (id, nombre, codigo, nodo_db, activo) VALUES
     (1, 'Lima',     'LIM', 'db-lima:5442',     TRUE),
@@ -206,7 +206,7 @@ INSERT INTO tipos_cambio (moneda_origen, moneda_destino, tasa_compra, tasa_venta
 VALUES ('USD', 'PEN', 3.7100, 3.7500, 3.7300);
 
 -- ============================================================
--- DATOS DE PRUEBA — usuarios y operaciones de Lima
+-- DATOS DE PRUEBA ÔÇö usuarios y operaciones de Lima
 -- ============================================================
 INSERT INTO usuarios (nombre_completo, email, password_hash, tipo_cuenta, dni_ruc, telefono, region_id) VALUES
     ('Carlos Quispe Mendoza',  'carlos.quispe@gmail.com',  'hash_carlos',  'personal', '45678901',    '987654321', 1),
@@ -259,6 +259,6 @@ INSERT INTO auditoria_sesiones (usuario_id, ip_address, user_agent, accion, regi
 SELECT u.id, '190.235.10.1', 'Mozilla/5.0 Chrome/120', 'login', 1
 FROM usuarios u WHERE u.email = 'carlos.quispe@gmail.com';
 
--- PRUEBA DE FRAGMENTACION — este INSERT debe fallar con error de constraint
+-- PRUEBA DE FRAGMENTACION ÔÇö este INSERT debe fallar con error de constraint
 -- INSERT INTO usuarios (nombre_completo, email, password_hash, tipo_cuenta, region_id)
 -- VALUES ('Intruso Arequipa', 'intruso@arequipa.com', 'hash', 'personal', 2);
