@@ -111,7 +111,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-tcya_mongo_local}
       MONGO_INITDB_DATABASE:      todocambioya_docs
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongodb_data:/data/db
       - ./src/main/resources/mongodb/init-collections.js:/docker-entrypoint-initdb.d/init-collections.js:ro

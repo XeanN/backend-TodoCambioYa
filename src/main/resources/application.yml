@@ -226,6 +226,10 @@ logging:
   #   mongodb:
   #     uri: mongodb://${MONGO_USER:tcya_mongo}:${MONGO_PASSWORD:tcya_mongo_local}@localhost:27017/todocambioya_docs
   #     auto-index-creation: true
+data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:tcya_mongo}:${MONGO_PASSWORD:tcya_mongo_local}@localhost:27018/todocambioya_docs?authSource=admin
+      auto-index-creation: true
 
   # ─────────────────────────────────────────────
   # FASE 4 — Cassandra
