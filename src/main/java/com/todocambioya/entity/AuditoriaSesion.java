@@ -28,7 +28,7 @@ public class AuditoriaSesion {
     private Usuario usuario;
 
     // INET de PostgreSQL se mapea como String en JPA
-    @Column(name = "ip_address")
+    @Column(name = "ip_address", columnDefinition="inet")
     private String ipAddress;
 
     @Column(name = "user_agent", columnDefinition = "TEXT")

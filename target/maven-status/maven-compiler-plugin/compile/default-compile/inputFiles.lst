@@ -25,6 +25,7 @@ D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\e
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\entity\Usuario.java
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\entity\UsuarioEmpresa.java
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\mongodb\document\NotificacionPush.java
+D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\mongodb\PgNotificationListener.java
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\mongodb\projection\NotificacionResumen.java
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\mongodb\repository\NotificacionPushRepository.java
 D:\ciclo5\Base de datos II\TipoDeCambio\backend\src\main\java\com\todocambioya\repository\AlertaTipoCambioRepository.java
